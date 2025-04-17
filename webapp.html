@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Run & Dodge</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #222;
+            margin: 0;
+            font-family: 'Press Start 2P', cursive;
+            color: #fff;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #gameContainer {
+            border: 5px solid #555;
+            position: relative;
+            background-color: #f0f0f0;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            width: 90%;
+            max-width: 800px;
+            aspect-ratio: 16 / 9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            display: block;
+            background-color: #87CEEB; /* Sky blue background */
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated; /* Keeps pixels sharp */
+        }
+        #score {
+            margin-top: 15px;
+            font-size: 1.5em;
+            color: #FFD700;
+            text-shadow: 2px 2px #000;
+        }
+         #instructions {
+            margin-top: 10px;
+            font-size: 0.8em;
+            color: #ccc;
+         }
+        #crackOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            display: none;
+        }
+        #gameOverMessage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: red;
+            font-size: 2em;
+            text-align: center;
+            text-shadow: 3px 3px #000;
+            display: none;
+            z-index: 11;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <svg id="crackOverlay" viewbox="0 0 100 100" preserveAspectRatio="none"></svg>
+        <div id="gameOverMessage">GAME OVER!<br><span style="font-size: 0.5em;">Press R to Restart</span></div>
+    </div>
+    <div id="score">Score: 0</div>
+    <div id="instructions">Space = Jump | N = Duck | R = Restart</div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const crackOverlay = document.getElementById('crackOverlay');
+        const gameOverMessage = document.getElementById('gameOverMessage');
+        const gameContainer = document.getElementById('gameContainer');
+
+        // --- Configuration ---
+        const PLAYER_BASE_WIDTH = 25;
+        const PLAYER_BASE_HEIGHT = 55;
+        const PLAYER_BASE_DUCK_HEIGHT = 30;
+        const GROUND_PERCENTAGE = 0.15;
+        const BASE_GAME_SPEED = 5;
+        const BASE_GRAVITY = 0.6;
+        const BASE_JUMP_POWER = 12;
+        const OBSTACLE_MIN_WIDTH_FACTOR = 20;
+        const OBSTACLE_RAND_WIDTH_FACTOR = 30;
+        const OBSTACLE_MIN_HEIGHT_FACTOR = 10;
+        const TOP_OBSTACLE_BOTTOM_MARGIN = 0.4;
+        const BOTTOM_OBSTACLE_TOP_MARGIN = 20;
+        const LAVA_DRIP_COUNT = 5;
+        const MAX_CONSECUTIVE_OBSTACLES = 3; // Max times lava or mountain can repeat
+
+        // --- Game State ---
+        let scale = 1;
+        let score = 0;
+        let gameSpeed = BASE_GAME_SPEED;
+        let gravity = BASE_GRAVITY;
+        let isGameOver = false;
+        let animationFrameId;
+        let obstacles = [];
+        let frameCount = 0;
+        let groundHeight;
+        let lastObstacleType = null; // Tracks the type ('top' or 'bottom') of the last obstacle
+        let consecutiveCount = 0; // Tracks how many times the last type repeated
+
+        // --- Player State ---
+        const player = {
+            x: 50, y: 0, baseY: 0,
+            width: PLAYER_BASE_WIDTH, height: PLAYER_BASE_HEIGHT, duckHeight: PLAYER_BASE_DUCK_HEIGHT,
+            dy: 0, jumpPower: BASE_JUMP_POWER,
+            isJumping: false, isDucking: false,
+            runFrame: 0, runAnimationSpeed: 8
+        };
+
+        // --- Game Functions ---
+
+        function resizeCanvas() {
+            const containerRect = gameContainer.getBoundingClientRect();
+            canvas.width = containerRect.width; canvas.height = containerRect.height;
+            scale = Math.max(0.1, canvas.width / 800);
+
+            groundHeight = canvas.height * GROUND_PERCENTAGE;
+            gameSpeed = BASE_GAME_SPEED * scale; gravity = BASE_GRAVITY * scale;
+            player.jumpPower = BASE_JUMP_POWER * Math.sqrt(scale);
+
+            player.width = PLAYER_BASE_WIDTH * scale; player.height = PLAYER_BASE_HEIGHT * scale;
+            player.duckHeight = PLAYER_BASE_DUCK_HEIGHT * scale;
+            player.baseY = canvas.height - groundHeight - player.height; player.y = player.baseY;
+
+            obstacles.forEach(obstacle => {
+                const currentRelativeX = obstacle.x / (obstacle.initialWidth || canvas.width);
+                obstacle.width *= scale / (obstacle.lastScale || scale);
+                obstacle.height *= scale / (obstacle.lastScale || scale);
+                obstacle.x = currentRelativeX * canvas.width;
+                if (obstacle.y !== 0) { obstacle.y = canvas.height - obstacle.height; }
+                 obstacle.lastScale = scale; obstacle.initialWidth = canvas.width;
+            });
+
+            if (!isGameOver) draw(); else drawGameOver();
+        }
+
+        function drawPlayer() {
+            let currentHeight = player.isDucking ? player.duckHeight : player.height;
+            let currentY = player.isDucking ? player.baseY + (player.height - player.duckHeight) : player.y;
+            const currentWidth = player.width;
+            currentHeight = Math.max(1, currentHeight);
+            currentY = Math.min(currentY, canvas.height - currentHeight); currentY = Math.max(0, currentY);
+
+            const bodyColor = '#9E9E9E'; const headColor = '#BDBDBD';
+            const hornColor = '#616161'; const legColor = '#757575';
+
+            const bodyHeight = currentHeight * 0.7; const bodyY = currentY + currentHeight * 0.1;
+            const headWidth = currentWidth * 0.5; const headHeight = currentHeight * 0.4;
+            let headX = player.x + currentWidth * 0.7; let headY = currentY;
+            const hornWidth = currentWidth * 0.15; const hornHeight = currentHeight * 0.2;
+            let hornX = headX + headWidth * 0.6; let hornY = headY + headHeight * 0.1;
+            const legWidth = currentWidth * 0.25; const legHeight = currentHeight * 0.3;
+            const legY = bodyY + bodyHeight - legHeight * 0.5;
+
+            if (player.isDucking) { headY = currentY + currentHeight * 0.3; hornY = headY + headHeight * 0.1; }
+
+            ctx.fillStyle = legColor;
+            const legOffset = (Math.floor(frameCount / player.runAnimationSpeed) % 2 === 0) ? currentWidth * 0.1 : -currentWidth * 0.1;
+            ctx.fillRect(player.x + currentWidth * 0.15 + legOffset, legY, legWidth, legHeight);
+            ctx.fillRect(player.x + currentWidth * 0.6 - legOffset, legY, legWidth, legHeight);
+            ctx.fillStyle = bodyColor; ctx.fillRect(player.x, bodyY, currentWidth, bodyHeight);
+            ctx.fillStyle = headColor; ctx.fillRect(headX, headY, headWidth, headHeight);
+            ctx.fillStyle = hornColor; ctx.fillRect(hornX, hornY, hornWidth, hornHeight);
+        }
+
+        function drawGround() {
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
+        }
+
+        function drawObstacles() {
+            obstacles.forEach(obstacle => {
+                if (obstacle.width <= 0 || obstacle.height <= 0) return;
+
+                const x = obstacle.x; const w = obstacle.width;
+                const h = obstacle.height; const y = obstacle.y;
+
+                if (y === 0) { // Lava
+                    const mainLavaColor = '#FF4500'; const highlightLavaColor = '#FFA500';
+                    const coreLavaColor = '#DC143C';
+                    const bodyHeight = h * 0.7;
+                    ctx.fillStyle = mainLavaColor; ctx.fillRect(x, y, w, bodyHeight);
+                    const dripRadius = w / (LAVA_DRIP_COUNT * 2); const dripBaseY = y + bodyHeight;
+                    for (let i = 0; i < LAVA_DRIP_COUNT; i++) {
+                        const dripCenterX = x + dripRadius + i * (dripRadius * 2);
+                        const randomDripLength = h * 0.2 + Math.random() * (h * 0.3);
+                        ctx.fillStyle = mainLavaColor; ctx.beginPath();
+                        ctx.arc(dripCenterX, dripBaseY, dripRadius, 0, Math.PI); ctx.fill();
+                        ctx.fillRect(dripCenterX - dripRadius, dripBaseY, dripRadius * 2, randomDripLength * 0.5);
+                        ctx.fillStyle = highlightLavaColor; ctx.beginPath();
+                        ctx.arc(dripCenterX, dripBaseY, dripRadius * 0.6, 0, Math.PI); ctx.fill();
+                        ctx.fillStyle = coreLavaColor; ctx.beginPath();
+                        ctx.arc(dripCenterX, dripBaseY, dripRadius * 0.3, 0, Math.PI); ctx.fill();
+                    }
+                } else { // Mountain
+                    const mountainColor = '#A9A9A9'; const snowColor = '#FFFFFF';
+                    const mountainBaseY = canvas.height; const mountainTopY = canvas.height - h;
+                    const mountainPeakX = x + w / 2;
+                    ctx.fillStyle = mountainColor; ctx.beginPath();
+                    ctx.moveTo(x, mountainBaseY - groundHeight); ctx.lineTo(mountainPeakX, mountainTopY);
+                    ctx.lineTo(x + w, mountainBaseY - groundHeight); ctx.closePath(); ctx.fill();
+                    if (h > 30 * scale) {
+                        const snowTopY = mountainTopY; const snowBottomY = mountainTopY + h * 0.3;
+                        const snowBaseWidth = w * ( (snowBottomY - mountainTopY) / h );
+                        ctx.fillStyle = snowColor; ctx.beginPath();
+                        ctx.moveTo(mountainPeakX - snowBaseWidth / 2, snowBottomY); ctx.lineTo(mountainPeakX, snowTopY);
+                        ctx.lineTo(mountainPeakX + snowBaseWidth / 2, snowBottomY); ctx.closePath(); ctx.fill();
+                    }
+                }
+            });
+        }
+
+        function updatePlayer() {
+            if (player.y < player.baseY || player.dy < 0) { player.dy += gravity; player.y += player.dy; }
+            if (player.y >= player.baseY && player.dy >= 0) { player.y = player.baseY; player.dy = 0; if (player.isJumping) { player.isJumping = false; } }
+        }
+
+        function updateObstacles() {
+            const spawnRate = Math.max(60, 150 - Math.floor(score / 10));
+            if (frameCount % spawnRate === 0) { createObstacle(); }
+            obstacles.forEach(obstacle => { obstacle.x -= gameSpeed; });
+            obstacles = obstacles.filter(obstacle => obstacle.x + obstacle.width > 0);
+        }
+
+        function createObstacle() {
+            let comesFromTop;
+            let currentType;
+
+            // --- Obstacle Type Generation Logic ---
+            if (lastObstacleType && consecutiveCount >= MAX_CONSECUTIVE_OBSTACLES) {
+                // Force the opposite type if the limit is reached
+                comesFromTop = (lastObstacleType === 'top') ? false : true;
+                currentType = comesFromTop ? 'top' : 'bottom';
+                // Reset count for the new type sequence starting now
+                consecutiveCount = 1;
+            } else {
+                // Decide randomly
+                comesFromTop = Math.random() > 0.5;
+                currentType = comesFromTop ? 'top' : 'bottom';
+                // Update consecutive count
+                if (currentType === lastObstacleType) {
+                    consecutiveCount++;
+                } else {
+                    // Reset count if type changes
+                    consecutiveCount = 1;
+                }
+            }
+            // Update the last generated type
+            lastObstacleType = currentType;
+            // --- End Obstacle Type Generation Logic ---
+
+
+            // Calculate dimensions based on the determined type (comesFromTop)
+            const baseWidth = OBSTACLE_MIN_WIDTH_FACTOR + Math.random() * OBSTACLE_RAND_WIDTH_FACTOR;
+            let obstacleWidth = Math.max(1, baseWidth * scale);
+            let obstacleHeight; let obstacleY;
+
+            if (comesFromTop) { // Lava
+                obstacleY = 0;
+                const targetBottomY = player.baseY + player.duckHeight * (1 - TOP_OBSTACLE_BOTTOM_MARGIN);
+                obstacleHeight = targetBottomY - (Math.random() * player.duckHeight * 0.5);
+                obstacleHeight = Math.max(OBSTACLE_MIN_HEIGHT_FACTOR * scale, obstacleHeight);
+                obstacleHeight = Math.min(obstacleHeight, canvas.height - groundHeight - 5);
+            } else { // Mountain
+                 const randomBaseHeight = 50 + Math.random() * 100;
+                 obstacleHeight = Math.max(OBSTACLE_MIN_HEIGHT_FACTOR * scale, randomBaseHeight * scale);
+                 obstacleHeight = Math.min(obstacleHeight, player.baseY - (BOTTOM_OBSTACLE_TOP_MARGIN * scale));
+                 obstacleHeight = Math.max(OBSTACLE_MIN_HEIGHT_FACTOR * scale, obstacleHeight);
+                 obstacleY = canvas.height - obstacleHeight;
+            }
+
+            // Add the created obstacle to the array
+            obstacles.push({
+                x: canvas.width, y: obstacleY, width: obstacleWidth, height: obstacleHeight,
+                lastScale: scale, initialWidth: canvas.width
+            });
+        }
+
+        function checkCollision() {
+            let playerCurrentHeight = player.isDucking ? player.duckHeight : player.height;
+            let playerCurrentY = player.isDucking ? player.baseY + (player.height - player.duckHeight) : player.y;
+            let playerTop = playerCurrentY; let playerBottom = playerCurrentY + playerCurrentHeight;
+            let playerLeft = player.x; let playerRight = player.x + player.width;
+
+            for (const obstacle of obstacles) {
+                const tolerance = 1;
+                let obstacleTop = obstacle.y; let obstacleBottom = obstacle.y + obstacle.height;
+                let obstacleLeft = obstacle.x + tolerance; let obstacleRight = obstacle.x + obstacle.width - tolerance;
+
+                if (obstacle.y !== 0) { // Mountain
+                     if (playerRight > obstacleLeft && playerLeft < obstacleRight && playerBottom > obstacleTop) {
+                          // Using bounding box check for simplicity with mountain triangle
+                          if (playerRight > obstacleLeft && playerLeft < obstacleRight && playerBottom > obstacleTop && playerTop < (canvas.height-groundHeight)) {
+                              gameOver(); return true;
+                          }
+                     }
+                } else { // Lava
+                    if (playerRight > obstacleLeft && playerLeft < obstacleRight &&
+                        playerBottom > obstacleTop && playerTop < obstacleBottom) {
+                        gameOver(); return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function drawCrackEffect() {
+            crackOverlay.innerHTML = ''; crackOverlay.style.display = 'block';
+            const numLines = 10; const centerX = 50; const centerY = 50;
+            for (let i = 0; i < numLines; i++) {
+                const angle = Math.random() * Math.PI * 2; const length = 30 + Math.random() * 40;
+                const endX = centerX + Math.cos(angle) * length; const endY = centerY + Math.sin(angle) * length;
+                let pathData = `M ${centerX},${centerY}`; const segments = 5;
+                for(let j = 1; j <= segments; j++) {
+                    const currentX = centerX + (endX - centerX) * (j / segments); const currentY = centerY + (endY - centerY) * (j / segments);
+                    const offsetX = (Math.random() - 0.5) * 4; const offsetY = (Math.random() - 0.5) * 4;
+                    pathData += ` L ${currentX + offsetX},${currentY + offsetY}`;
+                }
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                line.setAttribute('d', pathData); line.setAttribute('stroke', `rgba(0, 0, 0, ${0.5 + Math.random() * 0.4})`);
+                line.setAttribute('stroke-width', `${0.2 + Math.random() * 0.3}`); line.setAttribute('fill', 'none');
+                crackOverlay.appendChild(line);
+            }
+        }
+
+         function drawGameOver() {
+             ctx.clearRect(0, 0, canvas.width, canvas.height);
+             drawGround(); drawObstacles(); drawPlayer();
+             drawCrackEffect(); gameOverMessage.style.display = 'block';
+         }
+
+        function gameOver() {
+            if (isGameOver) return; isGameOver = true;
+            cancelAnimationFrame(animationFrameId); drawGameOver();
+        }
+
+        function resetGame() {
+            score = 0; obstacles = []; frameCount = 0; isGameOver = false;
+            // Reset obstacle tracking state
+            lastObstacleType = null;
+            consecutiveCount = 0;
+
+            scale = Math.max(0.1, canvas.width / 800);
+            groundHeight = canvas.height * GROUND_PERCENTAGE;
+            gameSpeed = BASE_GAME_SPEED * scale; gravity = BASE_GRAVITY * scale;
+            player.jumpPower = BASE_JUMP_POWER * Math.sqrt(scale);
+            player.width = PLAYER_BASE_WIDTH * scale; player.height = PLAYER_BASE_HEIGHT * scale;
+            player.duckHeight = PLAYER_BASE_DUCK_HEIGHT * scale;
+            player.baseY = canvas.height - groundHeight - player.height;
+            player.y = player.baseY; player.dy = 0;
+            player.isJumping = false; player.isDucking = false;
+
+            scoreElement.textContent = `Score: ${score}`;
+            crackOverlay.style.display = 'none'; gameOverMessage.style.display = 'none';
+            crackOverlay.innerHTML = '';
+
+            cancelAnimationFrame(animationFrameId); loop();
+        }
+
+        function updateScore() {
+            score++; scoreElement.textContent = `Score: ${score}`;
+            if (score > 0 && score % 100 === 0) { gameSpeed += 0.5 * scale; }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGround(); drawPlayer(); drawObstacles();
+        }
+
+        function loop() {
+            if (isGameOver) return;
+            frameCount++;
+            updatePlayer(); updateObstacles(); updateScore();
+            const collided = checkCollision();
+            if (collided) return;
+            draw();
+            animationFrameId = requestAnimationFrame(loop);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (isGameOver) { if (e.code === 'KeyR') { resetGame(); } return; }
+            if (e.code === 'Space') {
+                 if (!player.isJumping && !player.isDucking && player.y >= player.baseY - 5) {
+                    player.dy = -player.jumpPower; player.isJumping = true;
+                 }
+            } else if (e.code === 'KeyN') {
+                 if (!player.isJumping) { player.isDucking = true; }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'KeyN') { if (player.isDucking) { player.isDucking = false; } }
+        });
+
+        window.onload = () => {
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas(); resetGame();
+        };
+
+    </script>
+    <br>
+    <a href="webdevscratch.html">Scratch</a>
+    <link rel="stylesheet" href="style.css">
+</body>
+</html>

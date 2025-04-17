@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Page</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"> -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-blue-100 p-8">
+
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+        <h1 class="text-5xl font-bold text-black-800 text-center">Being a Linemen is Cool</h1>
+
+        <!-- Jason Kelce Highlights -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <div class="p-4 rounded-lg shadow">
+                <h2 class="text-3xl font-semibold text-black-700">Jason Kelce Highlights</h2>
+                <div class="aspect-w-16 aspect-h-9 rounded-lg">
+                    <iframe width="560" height="315" src="https://www.youtube.com/embed/AqNc5u58tEU?si=5lZbw4nKe0lzVPJd" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen></iframe>
+                </div>
+                <p>Jason Kelce the Goat</p>
+                <img src="https://images.radio.com/aiu-media/GettyImages1437759376-5df36db1-275c-4fd3-9978-0a58dd483362.jpg" 
+                    alt="Batman Kelce" style="float: right;" />
+            </div>
+        </div>
+
+        <!-- Jason Kelce Info -->
+        <h2 class="text-3xl font-semibold text-gray-700" style="color: rgb(0, 0, 0);">Jason Kelce</h2>
+        <ul style="list-style-type: square; padding-left: 20px;">
+            <li>Personal
+                <ol style="list-style-type:decimal; padding-left: 20px;">
+                    <li>37 Years Old</li>
+                    <li>Born in Ohio</li>
+                    <li>Wife and 4 daughters</li>
+                </ol>
+            </li>
+            <li>Metrics
+                <ol style="list-style-type:decimal; padding-left: 20px;">
+                    <li>6'3"</li>
+                    <li>282 lbs</li>
+                </ol>
+            </li>
+            <li>Career
+                <ol style="list-style-type:decimal; padding-left: 20px;">
+                    <li>13 Seasons</li>
+                    <li>7 Pro Bowls</li>
+                    <li>1 Super Bowl</li>
+                </ol>
+            </li>
+        </ul>
+                
+
+
+        <!-- Tableau Embed -->
+        <div class="bg-white p-4 rounded-lg shadow mb-8">
+            <h2 class="text-3xl font-semibold text-black-700">Interactive Tableau</h2>
+            <div class='tableauPlaceholder' id='viz1744757100602'>
+                <noscript>
+                    <a href='#'><img alt='NFL Teams by County' 
+                        src='https://public.tableau.com/static/images/US/USCountiesNFLMap/NFLTeamsCountyMap/1_rss.png' /></a>
+                </noscript>
+                <object class='tableauViz' style='display:none;'>
+                    <param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' />
+                    <param name='name' value='USCountiesNFLMap/NFLTeamsCountyMap' />
+                    <param name='toolbar' value='yes' />
+                </object>
+            </div>
+            <script type='text/javascript'>
+                var divElement = document.getElementById('viz1744757100602');
+                var vizElement = divElement.getElementsByTagName('object')[0];
+                vizElement.style.width = '100%';
+                vizElement.style.height = (divElement.offsetWidth * 0.75) + 'px';
+                var scriptElement = document.createElement('script');
+                scriptElement.src = 'https://public.tableau.com/javascripts/api/viz_v1.js';
+                vizElement.parentNode.insertBefore(scriptElement, vizElement);
+            </script>
+        </div>
+
+        <!-- Explore More Links -->
+        <h2 class="text-5xl text-center">Explore More</h2>
+        <div class="flex flex-col md:flex-row justify-center gap-8">
+            <a href=""></a>
+            <a href="index.html" class="text-blue-800 text-2xl hover:text-blue-600">Home BootStrap</a>
+            <a href="webapp.html" class="text-blue-800 text-2xl hover:text-blue-600">Play a Game</a>
+        </div>
+    </div>
+
+</body>
+
+</html>
