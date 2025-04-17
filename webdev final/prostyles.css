@@ -1,0 +1,107 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 40px auto;
+    max-width: 700px;
+    line-height: 1.6;
+    color: #333;
+    text-align: center; /* Center all text */
+  }
+  
+  h1, h2 {
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 4px;
+  }
+  
+  h1 {
+    font-size: 35px;
+    margin-bottom: 5px;
+  }
+  
+  h2 {
+    margin-top: 30px;
+    font-size: 25px;
+  }
+  
+  .section {
+    margin-bottom: 20px;
+
+  }
+  
+  .item {
+    margin-bottom: 10px;
+    font-size: 150%;
+  }
+  
+  .item-title {
+    font-weight: bold;
+    font-size: 2000%;
+  }
+  
+  .item-subtitle {
+    font-style: italic;
+    color: #666;
+    font-size: 200%;
+  }
+  
+  ul {
+    list-style: none; /* Optional: remove bullet points */
+    padding-left: 0;   /* Remove left padding */
+    margin: 0 auto;
+    display: inline-block; /* Make the list block-size so it centers */
+    text-align: left;      /* Keep list items aligned to the left */
+  }
+  .masthead {
+    width: 100%;
+    background-repeat: no-repeat;
+    background-size: cover !important;
+    /* Ensures the image covers the entire area */
+}
+
+.masthead .page-heading,
+.masthead .post-heading,
+.masthead .site-heading {
+    padding: 200px 0 150px;
+    /* Adjust padding as needed */
+    color: #fff;
+}
+
+@media (min-width: 768px) {
+
+    .masthead .page-heading,
+    .masthead .post-heading,
+    .masthead .site-heading {
+        padding: 200px 0;
+        /* Adjust padding for larger screens */
+    }
+}
+
+.masthead .page-heading h1,
+.masthead .page-heading .subheading {
+    text-align: center;
+}
+
+.masthead .page-heading h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.masthead .page-heading .subheading {
+    font-size: 1.5rem;
+    font-weight: 300;
+    line-height: 1.1;
+    display: block;
+    margin-top: 10px;
+}
+
+@media (min-width: 768px) {
+    .masthead .page-heading h1 {
+        font-size: 5.5rem;
+    }
+
+    .masthead .page-heading .subheading {
+        font-size: 2.25rem;
+    }
+}
+
+  

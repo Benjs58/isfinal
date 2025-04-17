@@ -1,0 +1,16 @@
+h1{
+    font-size: 400% !important;
+}
+.section{
+    font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif!important;
+}
+p{
+    text-decoration: underline !important;
+    font-size: 115% !important;
+}
+li{
+    font-size: xx-large;
+}
+.item-title{
+    font-size: xx-large !important;
+}
